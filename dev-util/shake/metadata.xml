@@ -6,6 +6,13 @@
 		<name>Gentoo Haskell</name>
 	</maintainer>
 	<use>
+		<flag name="cloud">Enable cloud build features</flag>
 		<flag name="embed-files">Embed data files into the shake library</flag>
+		<flag name="executable">Build the shake executable</flag>
+		<flag name="portable">Obtain FileTime using portable functions</flag>
 	</use>
+	<upstream>
+		<remote-id type="hackage">shake</remote-id>
+		<remote-id type="github">ndmitchell/shake</remote-id>
+	</upstream>
 </pkgmetadata>
