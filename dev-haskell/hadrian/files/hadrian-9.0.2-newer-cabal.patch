@@ -1,0 +1,52 @@
+From 594baa12df1f1c9f7fbc0db168f968cdea9e4f2f Mon Sep 17 00:00:00 2001
+From: hololeap <hololeap@users.noreply.github.com>
+Date: Sat, 18 Feb 2023 03:17:55 -0700
+Subject: [PATCH] Fix for newer Cabal
+
+Hide PackageName from the Cabal modules
+
+Use getSymbolicPath to convert a SymbolicPath to the expected String
+
+Signed-off-by: hololeap <hololeap@users.noreply.github.com>
+---
+ src/Hadrian/Haskell/Cabal/Parse.hs | 3 ++-
+ src/Hadrian/Haskell/Cabal/Type.hs  | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/Hadrian/Haskell/Cabal/Parse.hs b/src/Hadrian/Haskell/Cabal/Parse.hs
+index 58157a8..ee92339 100644
+--- a/src/Hadrian/Haskell/Cabal/Parse.hs
++++ b/src/Hadrian/Haskell/Cabal/Parse.hs
+@@ -39,6 +39,7 @@ import qualified Distribution.Text                             as C
+ import qualified Distribution.Types.LocalBuildInfo             as C
+ import qualified Distribution.Types.CondTree                   as C
+ import qualified Distribution.Types.MungedPackageId            as C
++import qualified Distribution.Utils.Path                       as C
+ #if MIN_VERSION_Cabal(3,2,0)
+ import qualified Distribution.Utils.ShortText                  as C
+ #endif
+@@ -281,7 +282,7 @@ resolveContextData context@Context {..} = do
+           , mainIs          = fmap (first C.display) mainIs
+           , modules         = map C.display modules
+           , otherModules    = map C.display $ C.otherModules buildInfo
+-          , srcDirs         = C.hsSourceDirs buildInfo
++          , srcDirs         = C.getSymbolicPath <$> C.hsSourceDirs buildInfo
+           , depIds          = depIds
+           , depNames        = map (C.display . C.mungedName . snd) extDeps
+           , includeDirs     = C.includeDirs     buildInfo
+diff --git a/src/Hadrian/Haskell/Cabal/Type.hs b/src/Hadrian/Haskell/Cabal/Type.hs
+index 2b5d51a..72955cf 100644
+--- a/src/Hadrian/Haskell/Cabal/Type.hs
++++ b/src/Hadrian/Haskell/Cabal/Type.hs
+@@ -12,7 +12,7 @@
+ module Hadrian.Haskell.Cabal.Type where
+ 
+ import Development.Shake.Classes
+-import Distribution.PackageDescription
++import Distribution.PackageDescription hiding (PackageName)
+ import GHC.Generics
+ 
+ import Hadrian.Package
+-- 
+2.39.2
+
