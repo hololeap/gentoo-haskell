@@ -166,7 +166,6 @@ BDEPEND="
 		app-text/docbook-xsl-stylesheets
 		dev-python/sphinx
 		>=dev-libs/libxslt-1.1.2 )
-	ghcbootstrap? ( ~dev-haskell/hadrian-${PV} )
 	!ghcbootstrap? ( ${PREBUILT_BINARY_DEPENDS} )
 	test? ( ${PYTHON_DEPS} )
 "
@@ -620,11 +619,14 @@ src_configure() {
 		echo "htmldir = ${EPREFIX}/usr/share/doc/$(cross)${PF}" >> mk/build.mk
 
 		# We also need to use the GHC_FLAGS flags when building ghc itself
-		echo "SRC_HC_OPTS+=${HCFLAGS} ${GHC_FLAGS}" >> mk/build.mk
-		echo "SRC_CC_OPTS+=${CFLAGS}" >> mk/build.mk
-		echo "SRC_LD_OPTS+=${LDFLAGS}" >> mk/build.mk
+		#echo "SRC_HC_OPTS+=${HCFLAGS} ${GHC_FLAGS}" >> mk/build.mk
+		echo "*.*.ghc.hs.opts += ${GHC_FLAGS}" >> _build/hadrian.settings
+		#echo "SRC_CC_OPTS+=${CFLAGS}" >> mk/build.mk
+		echo "*.*.ghc.cc.opts += ${CFLAGS}" >> _build/hadrian.settings
+		#echo "SRC_LD_OPTS+=${LDFLAGS}" >> mk/build.mk
+		echo "*.*.ghc.link.opts += ${LDFLAGS}" >> _build/hadrian.settings
 		# Speed up initial Cabal bootstrap
-		echo "utils/ghc-cabal_dist_EXTRA_HC_OPTS+=$(ghc-make-args)" >> mk/build.mk
+		#echo "utils/ghc-cabal_dist_EXTRA_HC_OPTS+=$(ghc-make-args)" >> mk/build.mk
 
 		# We can't depend on haddock except when bootstrapping when we
 		# must build docs and include them into the binary .tbz2 package
@@ -807,8 +809,8 @@ src_install() {
 
 		#[[ -f VERSION ]] || emake VERSION
 
-		einfo "Running ./hadrian/build install ${hadrianopts}"
-		./hadrian/build install --prefix="${D}/usr/" ${hadrianopts} || die
+		einfo "Running hadrian install ${hadrianopts}"
+		hadrian install --prefix="${D}/usr/" ${hadrianopts} || die
 		#emake -j1 install DESTDIR="${D}"
 
 		# fixup paths
