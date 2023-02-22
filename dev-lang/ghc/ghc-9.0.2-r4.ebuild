@@ -166,6 +166,7 @@ BDEPEND="
 		app-text/docbook-xsl-stylesheets
 		dev-python/sphinx
 		>=dev-libs/libxslt-1.1.2 )
+	ghcbootstrap? ( ~dev-haskell/hadrian-${PV} )
 	!ghcbootstrap? ( ${PREBUILT_BINARY_DEPENDS} )
 	test? ( ${PYTHON_DEPS} )
 "
@@ -607,9 +608,13 @@ src_prepare() {
 
 src_configure() {
 	if ! use binary; then
-		# initialize build.mk
-		echo '# Gentoo changes' > mk/build.mk
+		# prepare hadrian build settings files
+		mkdir _build
+		touch _build/hadrian.settings
 
+		# create a string of CLI flags to be passed to hadrian build:
+		hadrian_vars=""
+		# TODO: figure out hadrian equivalent commands
 		# Put docs into the right place, ie /usr/share/doc/ghc-${GHC_PV}
 		echo "docdir = ${EPREFIX}/usr/share/doc/$(cross)${PF}" >> mk/build.mk
 		echo "htmldir = ${EPREFIX}/usr/share/doc/$(cross)${PF}" >> mk/build.mk
@@ -624,12 +629,14 @@ src_configure() {
 		# We can't depend on haddock except when bootstrapping when we
 		# must build docs and include them into the binary .tbz2 package
 		# app-text/dblatex is not in portage, can not build PDF or PS
-		echo "BUILD_SPHINX_PDF  = NO"  >> mk/build.mk
-		echo "BUILD_SPHINX_HTML = $(usex doc YES NO)" >> mk/build.mk
-		echo "BUILD_MAN = $(usex doc YES NO)" >> mk/build.mk
-
+		#echo "BUILD_SPHINX_PDF  = NO"  >> mk/build.mk
+		hadrian_vars+="--docs=no-sphinx-pdfs "
+		#echo "BUILD_SPHINX_HTML = $(usex doc YES NO)" >> mk/build.mk
+		use doc || hadrian_vars+="--docs=no-sphinx-html "
+		#echo "BUILD_MAN = $(usex doc YES NO)" >> mk/build.mk
+		use doc || hadrian_vars+="--docs=no-sphinx-man "
 		# this controls presence on 'xhtml' and 'haddock' in final install
-		echo "HADDOCK_DOCS       = YES" >> mk/build.mk
+		#echo "HADDOCK_DOCS       = YES" >> mk/build.mk
 
 		# not used outside of ghc's test
 		if [[ -n ${GHC_BUILD_DPH} ]]; then
@@ -642,15 +649,20 @@ src_configure() {
 		# target haddock binary to be runnabine.
 		if ! is_native; then
 			# disable docs generation as it requires running stage2
-			echo "HADDOCK_DOCS=NO" >> mk/build.mk
-			echo "BUILD_SPHINX_HTML=NO" >> mk/build.mk
-			echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
+			# echo "HADDOCK_DOCS=NO" >> mk/build.mk
+			hadrian_vars+="--docs=no-haddocks "
+			# echo "BUILD_SPHINX_HTML=NO" >> mk/build.mk
+			hadrian_vars+="--docs=no-sphinx-pdfs "
+			# echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
+			hadrian_vars+="--docs=no-sphinx-html "
 		fi
 
 		if is_crosscompile; then
 			# Install ghc-stage1 crosscompiler instead of
 			# ghc-stage2 cross-built compiler.
-			echo "Stage1Only=YES" >> mk/build.mk
+			#echo "Stage1Only=YES" >> mk/build.mk
+			sed -i -e 's/finalStage = Stage2/finalStage = Stage1/' \
+				hadrian/UserSettings.hs
 		fi
 
 		# allows overriding build flavours for libraries:
@@ -669,10 +681,12 @@ src_configure() {
 			export PATH="${WORKDIR}/usr/bin:${PATH}"
 		fi
 
-		echo "BIGNUM_BACKEND = $(usex gmp gmp native)" >> mk/build.mk
+		# Allow the user to select their bignum backend (default to gmp):
+		# use gmp || sed -i -e 's/userFlavour = defaultFlavour { name = \"user\"/userFlavour = defaultFlavour { name = \"user\", bignumBackend = \"native\"/'
+		#echo "BIGNUM_BACKEND = $(usex gmp gmp native)" >> mk/build.mk
 
 		# don't strip anything. Very useful when stage2 SIGSEGVs on you
-		echo "STRIP_CMD = :" >> mk/build.mk
+		#echo "STRIP_CMD = :" >> mk/build.mk
 
 		local econf_args=()
 
@@ -733,7 +747,8 @@ src_configure() {
 		fi
 
 		einfo "Final mk/build.mk:"
-		cat mk/build.mk || die
+		#cat mk/build.mk || die
+		cat _build/hadrian.settings || die
 
 		econf ${econf_args[@]} \
 			--enable-bootstrap-with-devel-snapshot \
@@ -753,19 +768,22 @@ src_compile() {
 		# Stage1Only crosscompiler does not build stage2
 		if ! is_crosscompile; then
 			# 1. build/pax-mark compiler binary first
-			emake ghc/stage2/build/tmp/ghc-stage2
+			#emake ghc/stage2/build/tmp/ghc-stage2
+			hadrian/build -j${nproc} stage2:exe:ghc-bin
 			# 2. pax-mark (bug #516430)
-			pax-mark -m ghc/stage2/build/tmp/ghc-stage2
+			#pax-mark -m _build/stage1/bin/ghc
 			# 2. build/pax-mark haddock using ghc-stage2
 			if is_native; then
 				# non-native build does not build haddock
 				# due to HADDOCK_DOCS=NO, but it could.
-				emake utils/haddock/dist/build/tmp/haddock
-				pax-mark -m utils/haddock/dist/build/tmp/haddock
+				#emake utils/haddock/dist/build/tmp/haddock
+				hadrian/build docs --docs=no-sphinx-pdfs --docs=no-sphinx-html
+				#pax-mark -m utils/haddock/dist/build/tmp/haddock
 			fi
 		fi
 		# 3. and then all the rest
-		emake all
+		#emake all
+		hadrian -j${nproc}
 	fi # ! use binary
 }
 
@@ -774,9 +792,10 @@ src_test() {
 	#    - sandbox (pollutes environment)
 	#    - extra packages (to extend testsuite coverage)
 	# bits are taken from 'validate'
-	local make_test_target='test' # can be fulltest
+	#local make_test_target='test' # can be fulltest
 	# not 'emake' as testsuite uses '$MAKE' without jobserver available
-	make $make_test_target stage=2 THREADS=$(makeopts_jobs)
+	#make $make_test_target stage=2 THREADS=$(makeopts_jobs)
+	hadrian test
 }
 
 src_install() {
@@ -786,15 +805,15 @@ src_install() {
 	else
 		[[ -f VERSION ]] || emake VERSION
 
-		# -j1 due to a rare race in install script:
-		#    make --no-print-directory -f ghc.mk phase=final install
-		#    /usr/lib/portage/python3.4/ebuild-helpers/xattr/install -c -m 755 \
-		#        -d "/tmp/portage-tmpdir/portage/cross-armv7a-unknown-linux-gnueabi/ghc-9999/image/usr/lib64/armv7a-unknown-linux-gnueabi-ghc-8.3.20170404/include"
-		#    /usr/lib/portage/python3.4/ebuild-helpers/xattr/install -c -m 644  utils/hsc2hs/template-hsc.h \
-		#           "/tmp/portage-tmpdir/portage/cross-armv7a-unknown-linux-gnueabi/ghc-9999/image/usr/lib64/armv7a-unknown-linux-gnueabi-ghc-8.3.20170404"
-		#    /usr/bin/install: cannot create regular file \
-		#           '/tmp/portage-tmpdir/portage/cross-armv7a-unknown-linux-gnueabi/ghc-9999/image/usr/lib64/armv7a-unknown-linux-gnueabi-ghc-8.3.20170404': No such file or directory
-		emake -j1 install DESTDIR="${D}"
+		#[[ -f VERSION ]] || emake VERSION
+
+		einfo "Running ./hadrian/build install ${hadrianopts}"
+		./hadrian/build install --prefix="${D}/usr/" ${hadrianopts} || die
+		#emake -j1 install DESTDIR="${D}"
+
+		# fixup paths
+		mv "${D}/usr/lib" "${D}/usr/$(get_libdir)"
+		sed -i -e "s#${D}##;s#/usr/lib#/usr/$(get_libdir)#" "${D}/usr/bin/"*
 
 		use llvm && llvmize "${ED}/usr/bin"
 
