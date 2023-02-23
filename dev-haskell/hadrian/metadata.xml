@@ -11,7 +11,4 @@ performance. Users with bootstrap compilers
 which don&#39;t support the threaded runtime should
 disable this flag.</flag>
 	</use>
-	<upstream>
-		<remote-id type="github">ghc/ghc</remote-id>
-	</upstream>
 </pkgmetadata>
