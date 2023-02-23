@@ -1,0 +1,59 @@
+From ad3a423c5f3207b0832cbf53b2c4a1973ba20069 Mon Sep 17 00:00:00 2001
+From: hololeap <hololeap@users.noreply.github.com>
+Date: Wed, 22 Feb 2023 19:17:36 -0700
+Subject: [PATCH] Add 'no-profiling' flavour and enable it by default
+
+The 'default' flavour enables profiling which shouldn't be on by
+default. This adds a 'no-profiling' flavour, though the old 'default'
+flavour (with profiling) can be manually enabled by using
+'hadrian --flavour=default'.
+
+See: https://gitlab.haskell.org/ghc/ghc/blob/ghc-9.0.2-release/hadrian/doc/user-settings.md#build-ways
+Signed-off-by: hololeap <hololeap@users.noreply.github.com>
+---
+ src/UserSettings.hs | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/src/UserSettings.hs b/src/UserSettings.hs
+index 56353bf..0b333d1 100644
+--- a/src/UserSettings.hs
++++ b/src/UserSettings.hs
+@@ -10,7 +10,7 @@
+ -- functions for manipulating flavours.
+ -- Please update doc/user-settings.md when committing changes to this file.
+ module UserSettings (
+-    userFlavours, userPackages, userDefaultFlavour,
++    userFlavours, userPackages, userDefaultFlavour, noProfilingFlavour,
+     verboseCommand, buildProgressColour, successColour, finalStage
+     ) where
+ 
+@@ -24,17 +24,24 @@ import {-# SOURCE #-} Settings.Default
+ -- | Name of the default flavour, i.e the one used when no --flavour=<name>
+ --   argument is passed to Hadrian.
+ userDefaultFlavour :: String
+-userDefaultFlavour = "default"
++userDefaultFlavour = "no-profiling"
+ 
+ -- | User-defined build flavours. See 'userFlavour' as an example.
+ userFlavours :: [Flavour]
+-userFlavours = [userFlavour] -- Add more build flavours if need be.
++userFlavours = [userFlavour, noProfilingFlavour] -- Add more build flavours if need be.
+ 
+ -- | This is an example user-defined build flavour. Feel free to modify it and
+ -- use by passing @--flavour=user@ from the command line.
+ userFlavour :: Flavour
+ userFlavour = defaultFlavour { name = "user" } -- Modify other settings here.
+ 
++-- Turn off profiling on the default flavour
++noProfilingFlavour :: Flavour
++noProfilingFlavour = defaultFlavour
++    { name        = "no-profiling"
++    , libraryWays = remove [profiling] defaultLibraryWays
++    , ghcProfiled = False } -- Can't build profiled GHC without profiled libraries
++
+ -- | Add user-defined packages. Note, this only lets Hadrian know about the
+ -- existence of a new package; to actually build it you need to create a new
+ -- build flavour, modifying the list of packages that are built by default.
+-- 
+2.39.2
+

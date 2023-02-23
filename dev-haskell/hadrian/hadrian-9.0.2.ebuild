@@ -19,6 +19,7 @@ IUSE="+threaded"
 
 PATCHES=(
 	"${FILESDIR}/${PN}-9.0.2-newer-cabal.patch"
+	"${FILESDIR}/${PN}-9.0.2-no-profiling-flavour.patch"
 )
 
 CABAL_CHDEPS=(
