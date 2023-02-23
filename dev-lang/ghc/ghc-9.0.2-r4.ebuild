@@ -663,15 +663,22 @@ src_configure() {
 #				hadrian/UserSettings.hs
 #		fi
 
-		# allows overriding build flavours for libraries:
-		# v   - vanilla (static libs)
-		# p   - profiled
-		# dyn - shared libraries
-		# example: GHC_LIBRARY_WAYS="v dyn"
-		if [[ -n ${GHC_LIBRARY_WAYS} ]]; then
-			echo "GhcLibWays=${GHC_LIBRARY_WAYS}" >> mk/build.mk
+#		# allows overriding build flavours for libraries:
+#		# v   - vanilla (static libs)
+#		# p   - profiled
+#		# dyn - shared libraries
+#		# example: GHC_LIBRARY_WAYS="v dyn"
+#		if [[ -n ${GHC_LIBRARY_WAYS} ]]; then
+#			echo "GhcLibWays=${GHC_LIBRARY_WAYS}" >> mk/build.mk
+#		fi
+#		echo "BUILD_PROF_LIBS = $(usex profile YES NO)" >> mk/build.mk
+		if [[ -n $HADRIAN_FLAVOUR ]]; then
+			hadrian_vars+="--flavour=${HADRIAN_FLAVOUR} "
+		elif use profile; then
+			hadrian_vars+="--flavour=default "
+		else
+			hadrian_vars+="--flavour=no-profiling "
 		fi
-		echo "BUILD_PROF_LIBS = $(usex profile YES NO)" >> mk/build.mk
 
 		# Get ghc from the unpacked binary .tbz2
 		# except when bootstrapping we just pick ghc up off the path
@@ -768,27 +775,27 @@ src_configure() {
 
 src_compile() {
 	if ! use binary; then
-		# Stage1Only crosscompiler does not build stage2
-		if ! is_crosscompile; then
-			# 1. build/pax-mark compiler binary first
-			#emake ghc/stage2/build/tmp/ghc-stage2
-			hadrian -j${nproc} --flavour=quickest stage2:exe:ghc-bin || die
-			# 2. pax-mark (bug #516430)
-			#pax-mark -m _build/stage1/bin/ghc
-			# 2. build/pax-mark haddock using ghc-stage2
-			if is_native; then
-				# non-native build does not build haddock
-				# due to HADDOCK_DOCS=NO, but it could.
-				#emake utils/haddock/dist/build/tmp/haddock
-				hadrian docs --docs=no-sphinx-pdfs --docs=no-sphinx-html || die
-				#pax-mark -m utils/haddock/dist/build/tmp/haddock
-			fi
-		fi
-		# 3. and then all the rest
-		#emake all
+#		# Stage1Only crosscompiler does not build stage2
+#		if ! is_crosscompile; then
+#			# 1. build/pax-mark compiler binary first
+#			#emake ghc/stage2/build/tmp/ghc-stage2
+#			hadrian -j${nproc} --flavour=quickest stage2:exe:ghc-bin || die
+#			# 2. pax-mark (bug #516430)
+#			#pax-mark -m _build/stage1/bin/ghc
+#			# 2. build/pax-mark haddock using ghc-stage2
+#			if is_native; then
+#				# non-native build does not build haddock
+#				# due to HADDOCK_DOCS=NO, but it could.
+#				#emake utils/haddock/dist/build/tmp/haddock
+#				hadrian docs --docs=no-sphinx-pdfs --docs=no-sphinx-html || die
+#				#pax-mark -m utils/haddock/dist/build/tmp/haddock
+#			fi
+#		fi
+#		# 3. and then all the rest
+#		#emake all
 
-		# TODO: Allow the user to specify flavour as a make.conf variable
-		hadrian -j${nproc} --flavour=quickest || die
+		echo hadrian -j$(nproc) $hadrian_vars
+		hadrian -j$(nproc) $hadrian_vars || die
 	fi # ! use binary
 }
 
