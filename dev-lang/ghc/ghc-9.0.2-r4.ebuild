@@ -794,8 +794,8 @@ src_compile() {
 #		# 3. and then all the rest
 #		#emake all
 
-		echo hadrian -j$(nproc) $hadrian_vars
-		hadrian -j$(nproc) $hadrian_vars || die
+		einfo "Running: hadrian -j$(nproc) ${hadrian_vars}"
+		hadrian -j$(nproc) ${hadrian_vars} || die
 	fi # ! use binary
 }
 
@@ -819,8 +819,8 @@ src_install() {
 
 		#[[ -f VERSION ]] || emake VERSION
 
-		einfo "Running hadrian install ${hadrianopts}"
-		hadrian install --prefix="${D}/usr/" ${hadrianopts} || die
+		einfo "Running: hadrian install ${hadrian_vars}"
+		hadrian install --prefix="${D}/usr/" ${hadrian_vars} || die
 		#emake -j1 install DESTDIR="${D}"
 
 		# fixup paths
