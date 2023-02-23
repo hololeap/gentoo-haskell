@@ -579,7 +579,7 @@ src_prepare() {
 
 		#needs a port?
 		#eapply "${FILESDIR}"/${PN}-8.8.1-revert-CPP.patch
-		eapply "${FILESDIR}"/${PN}-8.10.1-allow-cross-bootstrap.patch
+#		eapply "${FILESDIR}"/${PN}-8.10.1-allow-cross-bootstrap.patch
 		#eapply "${FILESDIR}"/${PN}-8.10.3-C99-typo-ac270.patch
 
 		# a bunch of crosscompiler patches
@@ -606,20 +606,20 @@ src_prepare() {
 src_configure() {
 	if ! use binary; then
 		# prepare hadrian build settings files
-		mkdir _build
-		touch _build/hadrian.settings
+#		mkdir _build
+#		touch _build/hadrian.settings
 
 		# create a string of CLI flags to be passed to hadrian build:
 		hadrian_vars=""
 
 		# We also need to use the GHC_FLAGS flags when building ghc itself
 		#echo "SRC_HC_OPTS+=${HCFLAGS} ${GHC_FLAGS}" >> mk/build.mk
-		echo "*.*.ghc.hs.opts += ${GHC_FLAGS}" >> _build/hadrian.settings
+#		echo "*.*.ghc.hs.opts += ${GHC_FLAGS}" >> _build/hadrian.settings
 		#echo "SRC_CC_OPTS+=${CFLAGS}" >> mk/build.mk
 		# ghc with hadrian is unhappy with these c.opts
 		#echo "*.*.ghc.c.opts += ${CFLAGS}" >> _build/hadrian.settings
 		#echo "SRC_LD_OPTS+=${LDFLAGS}" >> mk/build.mk
-		echo "*.*.ghc.link.opts += ${LDFLAGS}" >> _build/hadrian.settings
+#		echo "*.*.ghc.link.opts += ${LDFLAGS}" >> _build/hadrian.settings
 		# Speed up initial Cabal bootstrap
 		#echo "utils/ghc-cabal_dist_EXTRA_HC_OPTS+=$(ghc-make-args)" >> mk/build.mk
 
@@ -671,13 +671,14 @@ src_configure() {
 #			echo "GhcLibWays=${GHC_LIBRARY_WAYS}" >> mk/build.mk
 #		fi
 #		echo "BUILD_PROF_LIBS = $(usex profile YES NO)" >> mk/build.mk
-		if [[ -n $HADRIAN_FLAVOUR ]]; then
-			hadrian_vars+="--flavour=${HADRIAN_FLAVOUR} "
-		elif use profile; then
-			hadrian_vars+="--flavour=default "
-		else
-			hadrian_vars+="--flavour=no-profiling "
-		fi
+
+#		if [[ -n $HADRIAN_FLAVOUR ]]; then
+#			hadrian_vars+="--flavour=${HADRIAN_FLAVOUR} "
+#		elif use profile; then
+#			hadrian_vars+="--flavour=default "
+#		else
+#			hadrian_vars+="--flavour=no-profiling "
+#		fi
 
 		# Get ghc from the unpacked binary .tbz2
 		# except when bootstrapping we just pick ghc up off the path
@@ -745,9 +746,9 @@ src_configure() {
 			#    https://bugs.gentoo.org/557478
 			#  - disable ncurses support for ghc-pkg
 			#echo "libraries/haskeline_CONFIGURE_OPTS *. += --flag=-terminfo" >> mk/build.mk
-			echo "*.haskeline.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
+#			echo "*.haskeline.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
 			#echo "utils/ghc-pkg_HC_OPTS += -DBOOTSTRAPPING" >> mk/build.mk
-			echo "*.ghc-pkg.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
+#			echo "*.ghc-pkg.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
 		elif is_native; then
 			# using ${GTARGET}'s libffi is not supported yet:
 			# GHC embeds full path for ffi includes without /usr/${CTARGET} account.
@@ -759,10 +760,10 @@ src_configure() {
 		#cat mk/build.mk || die
 		cat _build/hadrian.settings || die
 
-		econf ${econf_args[@]} \
-			--enable-bootstrap-with-devel-snapshot \
-			$(use_enable elfutils dwarf-unwind) \
-			$(use_enable numa)
+		econf # ${econf_args[@]} \
+#			--enable-bootstrap-with-devel-snapshot \
+#			$(use_enable elfutils dwarf-unwind) \
+#			$(use_enable numa)
 
 		if [[ ${PV} == *9999* ]]; then
 			GHC_PV="$(grep 'S\[\"PACKAGE_VERSION\"\]' config.status | sed -e 's@^.*=\"\(.*\)\"@\1@')"
@@ -792,8 +793,10 @@ src_compile() {
 #		# 3. and then all the rest
 #		#emake all
 
-		einfo "Running: hadrian -j$(nproc) ${hadrian_vars}"
-		hadrian -j$(nproc) ${hadrian_vars} || die
+#		einfo "Running: hadrian -j$(nproc) ${hadrian_vars}"
+#		hadrian -j$(nproc) ${hadrian_vars} || die
+		einfo "Running: hadrian -j$(nproc)"
+		hadrian -j$(nproc) || die
 	fi # ! use binary
 }
 
@@ -815,8 +818,10 @@ src_install() {
 	else
 		[[ -f VERSION ]] || emake VERSION
 
-		einfo "Running: hadrian install ${hadrian_vars}"
-		hadrian install --prefix="${D}/usr/" ${hadrian_vars} || die
+#		einfo "Running: hadrian install ${hadrian_vars}"
+#		hadrian install --prefix="${D}/usr/" ${hadrian_vars} || die
+		einfo "Running: hadrian install"
+		hadrian install --prefix="${D}/usr/" || die
 		#emake -j1 install DESTDIR="${D}"
 
 		# Skip for cross-targets as they all share target location:
