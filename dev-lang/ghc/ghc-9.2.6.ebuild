@@ -591,9 +591,9 @@ src_prepare() {
 		eapply "${FILESDIR}"/${PN}-9.0.2-sphinx-6.patch
 
 		# mingw32 target
-		pushd "${S}/libraries/Win32"
-			eapply "${FILESDIR}"/${PN}-8.2.1_rc1-win32-cross-2-hack.patch # bad workaround
-		popd
+#		pushd "${S}/libraries/Win32"
+#			eapply "${FILESDIR}"/${PN}-8.2.1_rc1-win32-cross-2-hack.patch # bad workaround
+#		popd
 
 		bump_libs
 
@@ -737,7 +737,7 @@ src_configure() {
 			econf_args+=(--host=${CBUILD})
 		fi
 
-		if use ghcmakebinary; then
+#		if use ghcmakebinary; then
 			# When building booting libary we are trying to
 			# bundle or restrict most of external depends
 			# with unstable ABI:
@@ -749,16 +749,16 @@ src_configure() {
 #			echo "*.haskeline.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
 			#echo "utils/ghc-pkg_HC_OPTS += -DBOOTSTRAPPING" >> mk/build.mk
 #			echo "*.ghc-pkg.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
-		elif is_native; then
+#		elif is_native; then
 			# using ${GTARGET}'s libffi is not supported yet:
 			# GHC embeds full path for ffi includes without /usr/${CTARGET} account.
 			econf_args+=(--with-system-libffi)
 			econf_args+=(--with-ffi-includes=$($(tc-getPKG_CONFIG) libffi --cflags-only-I | sed -e 's@^-I@@'))
-		fi
+#		fi
 
-		einfo "Final mk/build.mk:"
+#		einfo "Final mk/build.mk:"
 		#cat mk/build.mk || die
-		cat _build/hadrian.settings || die
+#		cat _build/hadrian.settings || die
 
 		econf # ${econf_args[@]} \
 #			--enable-bootstrap-with-devel-snapshot \
@@ -820,7 +820,7 @@ src_install() {
 
 #		einfo "Running: hadrian install ${hadrian_vars}"
 #		hadrian install --prefix="${D}/usr/" ${hadrian_vars} || die
-		einfo "Running: hadrian install"
+		einfo "Running: hadrian install --prefix="${D}/usr/"
 		hadrian install --prefix="${D}/usr/" || die
 		#emake -j1 install DESTDIR="${D}"
 
