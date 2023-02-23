@@ -161,6 +161,7 @@ BDEPEND="
 		app-text/docbook-xsl-stylesheets
 		dev-python/sphinx
 		>=dev-libs/libxslt-1.1.2 )
+	ghcbootstrap? ( ~dev-haskell/hadrian-${PV} )
 	!ghcbootstrap? ( ${PREBUILT_BINARY_DEPENDS} )
 	test? ( ${PYTHON_DEPS} )
 "
@@ -604,61 +605,78 @@ src_prepare() {
 
 src_configure() {
 	if ! use binary; then
-		# initialize build.mk
-		echo '# Gentoo changes' > mk/build.mk
+		# prepare hadrian build settings files
+		mkdir _build
+		touch _build/hadrian.settings
 
-		# Put docs into the right place, ie /usr/share/doc/ghc-${GHC_PV}
-		echo "docdir = ${EPREFIX}/usr/share/doc/$(cross)${PF}" >> mk/build.mk
-		echo "htmldir = ${EPREFIX}/usr/share/doc/$(cross)${PF}" >> mk/build.mk
+		# create a string of CLI flags to be passed to hadrian build:
+		hadrian_vars=""
 
 		# We also need to use the GHC_FLAGS flags when building ghc itself
-		echo "SRC_HC_OPTS+=${HCFLAGS} ${GHC_FLAGS}" >> mk/build.mk
-		echo "SRC_CC_OPTS+=${CFLAGS}" >> mk/build.mk
-		echo "SRC_LD_OPTS+=${LDFLAGS}" >> mk/build.mk
+		#echo "SRC_HC_OPTS+=${HCFLAGS} ${GHC_FLAGS}" >> mk/build.mk
+		echo "*.*.ghc.hs.opts += ${GHC_FLAGS}" >> _build/hadrian.settings
+		#echo "SRC_CC_OPTS+=${CFLAGS}" >> mk/build.mk
+		echo "*.*.ghc.c.opts += ${CFLAGS}" >> _build/hadrian.settings
+		#echo "SRC_LD_OPTS+=${LDFLAGS}" >> mk/build.mk
+		echo "*.*.ghc.link.opts += ${LDFLAGS}" >> _build/hadrian.settings
 		# Speed up initial Cabal bootstrap
-		echo "utils/ghc-cabal_dist_EXTRA_HC_OPTS+=$(ghc-make-args)" >> mk/build.mk
+		#echo "utils/ghc-cabal_dist_EXTRA_HC_OPTS+=$(ghc-make-args)" >> mk/build.mk
 
 		# We can't depend on haddock except when bootstrapping when we
 		# must build docs and include them into the binary .tbz2 package
 		# app-text/dblatex is not in portage, can not build PDF or PS
-		echo "BUILD_SPHINX_PDF  = NO"  >> mk/build.mk
-		echo "BUILD_SPHINX_HTML = $(usex doc YES NO)" >> mk/build.mk
-		echo "BUILD_MAN = $(usex doc YES NO)" >> mk/build.mk
-
+		#echo "BUILD_SPHINX_PDF  = NO"  >> mk/build.mk
+		hadrian_vars+="--docs=no-sphinx-pdfs "
+		#echo "BUILD_SPHINX_HTML = $(usex doc YES NO)" >> mk/build.mk
+		use doc || hadrian_vars+="--docs=no-sphinx-html "
+		#echo "BUILD_MAN = $(usex doc YES NO)" >> mk/build.mk
+		use doc || hadrian_vars+="--docs=no-sphinx-man "
 		# this controls presence on 'xhtml' and 'haddock' in final install
-		echo "HADDOCK_DOCS       = YES" >> mk/build.mk
+		#echo "HADDOCK_DOCS       = YES" >> mk/build.mk
 
-		# not used outside of ghc's test
-		if [[ -n ${GHC_BUILD_DPH} ]]; then
-				echo "BUILD_DPH = YES" >> mk/build.mk
-			else
-				echo "BUILD_DPH = NO" >> mk/build.mk
-		fi
+#		# not used outside of ghc's test
+#		if [[ -n ${GHC_BUILD_DPH} ]]; then
+#				echo "BUILD_DPH = YES" >> mk/build.mk
+#			else
+#				echo "BUILD_DPH = NO" >> mk/build.mk
+#		fi
 
 		# Any non-native build has to skip as it needs
 		# target haddock binary to be runnabine.
 		if ! is_native; then
 			# disable docs generation as it requires running stage2
-			echo "HADDOCK_DOCS=NO" >> mk/build.mk
-			echo "BUILD_SPHINX_HTML=NO" >> mk/build.mk
-			echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
+			# echo "HADDOCK_DOCS=NO" >> mk/build.mk
+			hadrian_vars+="--docs=no-haddocks "
+			# echo "BUILD_SPHINX_HTML=NO" >> mk/build.mk
+			hadrian_vars+="--docs=no-sphinx-pdfs "
+			# echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
+			hadrian_vars+="--docs=no-sphinx-html "
 		fi
 
-		if is_crosscompile; then
-			# Install ghc-stage1 crosscompiler instead of
-			# ghc-stage2 cross-built compiler.
-			echo "Stage1Only=YES" >> mk/build.mk
-		fi
+#		if is_crosscompile; then
+#			# Install ghc-stage1 crosscompiler instead of
+#			# ghc-stage2 cross-built compiler.
+#			#echo "Stage1Only=YES" >> mk/build.mk
+#			sed -i -e 's/finalStage = Stage2/finalStage = Stage1/' \
+#				hadrian/UserSettings.hs
+#		fi
 
-		# allows overriding build flavours for libraries:
-		# v   - vanilla (static libs)
-		# p   - profiled
-		# dyn - shared libraries
-		# example: GHC_LIBRARY_WAYS="v dyn"
-		if [[ -n ${GHC_LIBRARY_WAYS} ]]; then
-			echo "GhcLibWays=${GHC_LIBRARY_WAYS}" >> mk/build.mk
+#		# allows overriding build flavours for libraries:
+#		# v   - vanilla (static libs)
+#		# p   - profiled
+#		# dyn - shared libraries
+#		# example: GHC_LIBRARY_WAYS="v dyn"
+#		if [[ -n ${GHC_LIBRARY_WAYS} ]]; then
+#			echo "GhcLibWays=${GHC_LIBRARY_WAYS}" >> mk/build.mk
+#		fi
+#		echo "BUILD_PROF_LIBS = $(usex profile YES NO)" >> mk/build.mk
+		if [[ -n $HADRIAN_FLAVOUR ]]; then
+			hadrian_vars+="--flavour=${HADRIAN_FLAVOUR} "
+		elif use profile; then
+			hadrian_vars+="--flavour=default "
+		else
+			hadrian_vars+="--flavour=no-profiling "
 		fi
-		echo "BUILD_PROF_LIBS = $(usex profile YES NO)" >> mk/build.mk
 
 		# Get ghc from the unpacked binary .tbz2
 		# except when bootstrapping we just pick ghc up off the path
@@ -666,10 +684,12 @@ src_configure() {
 			export PATH="${WORKDIR}/usr/bin:${PATH}"
 		fi
 
-		echo "BIGNUM_BACKEND = $(usex gmp gmp native)" >> mk/build.mk
+		# Allow the user to select their bignum backend (default to gmp):
+		# use gmp || sed -i -e 's/userFlavour = defaultFlavour { name = \"user\"/userFlavour = defaultFlavour { name = \"user\", bignumBackend = \"native\"/'
+		#echo "BIGNUM_BACKEND = $(usex gmp gmp native)" >> mk/build.mk
 
 		# don't strip anything. Very useful when stage2 SIGSEGVs on you
-		echo "STRIP_CMD = :" >> mk/build.mk
+		#echo "STRIP_CMD = :" >> mk/build.mk
 
 		local econf_args=()
 
@@ -686,6 +706,9 @@ src_configure() {
 			DllWrap=${CTARGET}-dllwrap
 			# we set the linker explicitly below
 			--disable-ld-override
+
+			# Put docs into the right place, ie /usr/share/doc/ghc-${GHC_PV}
+			--docdir="${EPREFIX}/usr/share/doc/$(cross)${PF}"
 		)
 		case ${CTARGET} in
 			arm*)
@@ -720,8 +743,10 @@ src_configure() {
 			#  - disable ncurses support for ghci (via haskeline)
 			#    https://bugs.gentoo.org/557478
 			#  - disable ncurses support for ghc-pkg
-			echo "libraries/haskeline_CONFIGURE_OPTS += --flag=-terminfo" >> mk/build.mk
-			echo "utils/ghc-pkg_HC_OPTS += -DBOOTSTRAPPING" >> mk/build.mk
+			#echo "libraries/haskeline_CONFIGURE_OPTS *. += --flag=-terminfo" >> mk/build.mk
+			echo "*.haskeline.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
+			#echo "utils/ghc-pkg_HC_OPTS += -DBOOTSTRAPPING" >> mk/build.mk
+			echo "*.ghc-pkg.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
 		elif is_native; then
 			# using ${GTARGET}'s libffi is not supported yet:
 			# GHC embeds full path for ffi includes without /usr/${CTARGET} account.
@@ -730,7 +755,8 @@ src_configure() {
 		fi
 
 		einfo "Final mk/build.mk:"
-		cat mk/build.mk || die
+		#cat mk/build.mk || die
+		cat _build/hadrian.settings || die
 
 		econf ${econf_args[@]} \
 			--enable-bootstrap-with-devel-snapshot \
@@ -746,22 +772,27 @@ src_configure() {
 
 src_compile() {
 	if ! use binary; then
-		# Stage1Only crosscompiler does not build stage2
-		if ! is_crosscompile; then
-			# 1. build/pax-mark compiler binary first
-			emake ghc/stage2/build/tmp/ghc-stage2
-			# 2. pax-mark (bug #516430)
-			pax-mark -m ghc/stage2/build/tmp/ghc-stage2
-			# 2. build/pax-mark haddock using ghc-stage2
-			if is_native; then
-				# non-native build does not build haddock
-				# due to HADDOCK_DOCS=NO, but it could.
-				emake utils/haddock/dist/build/tmp/haddock
-				pax-mark -m utils/haddock/dist/build/tmp/haddock
-			fi
-		fi
-		# 3. and then all the rest
-		emake all
+#		# Stage1Only crosscompiler does not build stage2
+#		if ! is_crosscompile; then
+#			# 1. build/pax-mark compiler binary first
+#			#emake ghc/stage2/build/tmp/ghc-stage2
+#			hadrian -j${nproc} --flavour=quickest stage2:exe:ghc-bin || die
+#			# 2. pax-mark (bug #516430)
+#			#pax-mark -m _build/stage1/bin/ghc
+#			# 2. build/pax-mark haddock using ghc-stage2
+#			if is_native; then
+#				# non-native build does not build haddock
+#				# due to HADDOCK_DOCS=NO, but it could.
+#				#emake utils/haddock/dist/build/tmp/haddock
+#				hadrian docs --docs=no-sphinx-pdfs --docs=no-sphinx-html || die
+#				#pax-mark -m utils/haddock/dist/build/tmp/haddock
+#			fi
+#		fi
+#		# 3. and then all the rest
+#		#emake all
+
+		einfo "Running: hadrian -j$(nproc) ${hadrian_vars}"
+		hadrian -j$(nproc) ${hadrian_vars} || die
 	fi # ! use binary
 }
 
@@ -770,9 +801,10 @@ src_test() {
 	#    - sandbox (pollutes environment)
 	#    - extra packages (to extend testsuite coverage)
 	# bits are taken from 'validate'
-	local make_test_target='test' # can be fulltest
+	#local make_test_target='test' # can be fulltest
 	# not 'emake' as testsuite uses '$MAKE' without jobserver available
-	make $make_test_target stage=2 THREADS=$(makeopts_jobs)
+	#make $make_test_target stage=2 THREADS=$(makeopts_jobs)
+	hadrian test || die
 }
 
 src_install() {
@@ -782,15 +814,9 @@ src_install() {
 	else
 		[[ -f VERSION ]] || emake VERSION
 
-		# -j1 due to a rare race in install script:
-		#    make --no-print-directory -f ghc.mk phase=final install
-		#    /usr/lib/portage/python3.4/ebuild-helpers/xattr/install -c -m 755 \
-		#        -d "/tmp/portage-tmpdir/portage/cross-armv7a-unknown-linux-gnueabi/ghc-9999/image/usr/lib64/armv7a-unknown-linux-gnueabi-ghc-8.3.20170404/include"
-		#    /usr/lib/portage/python3.4/ebuild-helpers/xattr/install -c -m 644  utils/hsc2hs/template-hsc.h \
-		#           "/tmp/portage-tmpdir/portage/cross-armv7a-unknown-linux-gnueabi/ghc-9999/image/usr/lib64/armv7a-unknown-linux-gnueabi-ghc-8.3.20170404"
-		#    /usr/bin/install: cannot create regular file \
-		#           '/tmp/portage-tmpdir/portage/cross-armv7a-unknown-linux-gnueabi/ghc-9999/image/usr/lib64/armv7a-unknown-linux-gnueabi-ghc-8.3.20170404': No such file or directory
-		emake -j1 install DESTDIR="${D}"
+		einfo "Running: hadrian install ${hadrian_vars}"
+		hadrian install --prefix="${D}/usr/" ${hadrian_vars} || die
+		#emake -j1 install DESTDIR="${D}"
 
 		# Skip for cross-targets as they all share target location:
 		# /usr/share/doc/ghc-9999/
