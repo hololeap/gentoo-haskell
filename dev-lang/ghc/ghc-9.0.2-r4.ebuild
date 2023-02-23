@@ -613,10 +613,6 @@ src_configure() {
 
 		# create a string of CLI flags to be passed to hadrian build:
 		hadrian_vars=""
-		# TODO: figure out hadrian equivalent commands
-		# Put docs into the right place, ie /usr/share/doc/ghc-${GHC_PV}
-		echo "docdir = ${EPREFIX}/usr/share/doc/$(cross)${PF}" >> mk/build.mk
-		echo "htmldir = ${EPREFIX}/usr/share/doc/$(cross)${PF}" >> mk/build.mk
 
 		# We also need to use the GHC_FLAGS flags when building ghc itself
 		#echo "SRC_HC_OPTS+=${HCFLAGS} ${GHC_FLAGS}" >> mk/build.mk
@@ -640,12 +636,12 @@ src_configure() {
 		# this controls presence on 'xhtml' and 'haddock' in final install
 		#echo "HADDOCK_DOCS       = YES" >> mk/build.mk
 
-		# not used outside of ghc's test
-		if [[ -n ${GHC_BUILD_DPH} ]]; then
-				echo "BUILD_DPH = YES" >> mk/build.mk
-			else
-				echo "BUILD_DPH = NO" >> mk/build.mk
-		fi
+#		# not used outside of ghc's test
+#		if [[ -n ${GHC_BUILD_DPH} ]]; then
+#				echo "BUILD_DPH = YES" >> mk/build.mk
+#			else
+#				echo "BUILD_DPH = NO" >> mk/build.mk
+#		fi
 
 		# Any non-native build has to skip as it needs
 		# target haddock binary to be runnabine.
@@ -659,13 +655,13 @@ src_configure() {
 			hadrian_vars+="--docs=no-sphinx-html "
 		fi
 
-		if is_crosscompile; then
-			# Install ghc-stage1 crosscompiler instead of
-			# ghc-stage2 cross-built compiler.
-			#echo "Stage1Only=YES" >> mk/build.mk
-			sed -i -e 's/finalStage = Stage2/finalStage = Stage1/' \
-				hadrian/UserSettings.hs
-		fi
+#		if is_crosscompile; then
+#			# Install ghc-stage1 crosscompiler instead of
+#			# ghc-stage2 cross-built compiler.
+#			#echo "Stage1Only=YES" >> mk/build.mk
+#			sed -i -e 's/finalStage = Stage2/finalStage = Stage1/' \
+#				hadrian/UserSettings.hs
+#		fi
 
 		# allows overriding build flavours for libraries:
 		# v   - vanilla (static libs)
@@ -705,6 +701,9 @@ src_configure() {
 			DllWrap=${CTARGET}-dllwrap
 			# we set the linker explicitly below
 			--disable-ld-override
+
+			# Put docs into the right place, ie /usr/share/doc/ghc-${GHC_PV}
+			--docdir="${EPREFIX}/usr/share/doc/$(cross)${PF}"
 		)
 		case ${CTARGET} in
 			arm*)
@@ -739,8 +738,10 @@ src_configure() {
 			#  - disable ncurses support for ghci (via haskeline)
 			#    https://bugs.gentoo.org/557478
 			#  - disable ncurses support for ghc-pkg
-			echo "libraries/haskeline_CONFIGURE_OPTS += --flag=-terminfo" >> mk/build.mk
-			echo "utils/ghc-pkg_HC_OPTS += -DBOOTSTRAPPING" >> mk/build.mk
+			#echo "libraries/haskeline_CONFIGURE_OPTS *. += --flag=-terminfo" >> mk/build.mk
+			echo "*.haskeline.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
+			#echo "utils/ghc-pkg_HC_OPTS += -DBOOTSTRAPPING" >> mk/build.mk
+			echo "*.ghc-pkg.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
 		elif is_native; then
 			# using ${GTARGET}'s libffi is not supported yet:
 			# GHC embeds full path for ffi includes without /usr/${CTARGET} account.
@@ -771,7 +772,7 @@ src_compile() {
 		if ! is_crosscompile; then
 			# 1. build/pax-mark compiler binary first
 			#emake ghc/stage2/build/tmp/ghc-stage2
-			hadrian/build -j${nproc} stage2:exe:ghc-bin
+			hadrian -j${nproc} --flavour=quickest stage2:exe:ghc-bin || die
 			# 2. pax-mark (bug #516430)
 			#pax-mark -m _build/stage1/bin/ghc
 			# 2. build/pax-mark haddock using ghc-stage2
@@ -779,13 +780,15 @@ src_compile() {
 				# non-native build does not build haddock
 				# due to HADDOCK_DOCS=NO, but it could.
 				#emake utils/haddock/dist/build/tmp/haddock
-				hadrian/build docs --docs=no-sphinx-pdfs --docs=no-sphinx-html
+				hadrian docs --docs=no-sphinx-pdfs --docs=no-sphinx-html || die
 				#pax-mark -m utils/haddock/dist/build/tmp/haddock
 			fi
 		fi
 		# 3. and then all the rest
 		#emake all
-		hadrian -j${nproc}
+
+		# TODO: Allow the user to specify flavour as a make.conf variable
+		hadrian -j${nproc} --flavour=quickest || die
 	fi # ! use binary
 }
 
@@ -797,7 +800,7 @@ src_test() {
 	#local make_test_target='test' # can be fulltest
 	# not 'emake' as testsuite uses '$MAKE' without jobserver available
 	#make $make_test_target stage=2 THREADS=$(makeopts_jobs)
-	hadrian test
+	hadrian test || die
 }
 
 src_install() {
