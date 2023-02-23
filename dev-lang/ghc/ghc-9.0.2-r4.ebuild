@@ -618,7 +618,7 @@ src_configure() {
 		#echo "SRC_HC_OPTS+=${HCFLAGS} ${GHC_FLAGS}" >> mk/build.mk
 		echo "*.*.ghc.hs.opts += ${GHC_FLAGS}" >> _build/hadrian.settings
 		#echo "SRC_CC_OPTS+=${CFLAGS}" >> mk/build.mk
-		echo "*.*.ghc.cc.opts += ${CFLAGS}" >> _build/hadrian.settings
+		echo "*.*.ghc.c.opts += ${CFLAGS}" >> _build/hadrian.settings
 		#echo "SRC_LD_OPTS+=${LDFLAGS}" >> mk/build.mk
 		echo "*.*.ghc.link.opts += ${LDFLAGS}" >> _build/hadrian.settings
 		# Speed up initial Cabal bootstrap
