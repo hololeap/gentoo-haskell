@@ -161,7 +161,7 @@ BDEPEND="
 		app-text/docbook-xsl-stylesheets
 		dev-python/sphinx
 		>=dev-libs/libxslt-1.1.2 )
-	ghcbootstrap? ( ~dev-haskell/hadrian-${PV} )
+	ghcbootstrap? ( dev-haskell/hadrian )
 	!ghcbootstrap? ( ${PREBUILT_BINARY_DEPENDS} )
 	test? ( ${PYTHON_DEPS} )
 "
@@ -820,7 +820,7 @@ src_install() {
 
 #		einfo "Running: hadrian install ${hadrian_vars}"
 #		hadrian install --prefix="${D}/usr/" ${hadrian_vars} || die
-		einfo "Running: hadrian install --prefix="${D}/usr/"
+		einfo "Running: hadrian install --prefix=${D}/usr/"
 		hadrian install --prefix="${D}/usr/" || die
 		#emake -j1 install DESTDIR="${D}"
 
