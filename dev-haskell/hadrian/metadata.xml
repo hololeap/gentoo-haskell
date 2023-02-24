@@ -6,6 +6,9 @@
 		<name>Gentoo Haskell</name>
 	</maintainer>
 	<use>
+		<flag name="test">Enables the hadrian selftest rules which require
+QuickCheck. Disabling it thus saves on a few dependencies
+which can be problematic when bootstrapping.</flag>
 		<flag name="threaded">Build with the threaded runtime for improved
 performance. Users with bootstrap compilers
 which don&#39;t support the threaded runtime should
