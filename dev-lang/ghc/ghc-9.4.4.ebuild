@@ -744,7 +744,7 @@ src_configure() {
 		#cat mk/build.mk || die
 #		cat _build/hadrian.settings || die
 
-		econf # ${econf_args[@]} \
+		econf --build="${CHOST}" # ${econf_args[@]} \
 #			--enable-bootstrap-with-devel-snapshot \
 #			$(use_enable elfutils dwarf-unwind) \
 #			$(use_enable numa)
@@ -780,7 +780,7 @@ src_compile() {
 #		einfo "Running: hadrian -j$(nproc) ${hadrian_vars}"
 #		hadrian -j$(nproc) ${hadrian_vars} || die
 		einfo "Running: hadrian -j$(nproc)"
-		hadrian -j$(nproc) || die
+		hadrian --flavour=quickest --docs=no-sphinx-pdfs -j$(nproc) binary-dist-dir || die
 	fi # ! use binary
 }
 
@@ -804,8 +804,12 @@ src_install() {
 
 #		einfo "Running: hadrian install ${hadrian_vars}"
 #		hadrian install --prefix="${D}/usr/" ${hadrian_vars} || die
-		einfo "Running: hadrian install --prefix=${D}/usr/"
-		hadrian install --prefix="${D}/usr/" || die
+
+		pushd "${S}/_build/bindist/${P}-${CHOST}" || die
+		econf
+		emake DESTDIR="${D}" install
+		popd
+
 		#emake -j1 install DESTDIR="${D}"
 
 		# Skip for cross-targets as they all share target location:
