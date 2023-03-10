@@ -1,7 +1,8 @@
 # hololeap <hololeap@protonmail.com> (2023-03-09)
 # Documentation is causing build failures when using hadrian, and it isn't
-# clear why
->=dev-lang/ghc-9.4 doc
+# clear why.
+# Testing hasn't been set up yet
+>=dev-lang/ghc-9.4 doc test
 
 # hololeap <hololeap@protonmail.com> (2023-01-11)
 # Enabling these flags will create cycles in the dependency graph. 
