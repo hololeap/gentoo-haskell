@@ -446,6 +446,9 @@ src_prepare() {
 
 	ghc_setup_cflags
 
+	einfo "GHC_FLAGS=\"${GHC_FLAGS}\""
+	einfo "GHC_PERSISTENT_FLAGS=\"${GHC_PERSISTENT_FLAGS}\""
+
 	if ! use ghcbootstrap && [[ ${CHOST} != *-darwin* && ${CHOST} != *-solaris* ]]; then
 		# Modify the wrapper script from the binary tarball to use GHC_PERSISTENT_FLAGS.
 		# See bug #313635.
@@ -590,34 +593,19 @@ src_prepare() {
 src_configure() {
 	if ! use binary; then
 		# prepare hadrian build settings files
-#		mkdir _build
-#		touch _build/hadrian.settings
-
-		# create a string of CLI flags to be passed to hadrian build:
-		hadrian_vars=""
+		mkdir _build
+		touch _build/hadrian.settings
 
 		# We also need to use the GHC_FLAGS flags when building ghc itself
 		#echo "SRC_HC_OPTS+=${HCFLAGS} ${GHC_FLAGS}" >> mk/build.mk
-#		echo "*.*.ghc.hs.opts += ${GHC_FLAGS}" >> _build/hadrian.settings
+		echo "*.*.ghc.hs.opts += ${GHC_FLAGS}" >> _build/hadrian.settings
 		#echo "SRC_CC_OPTS+=${CFLAGS}" >> mk/build.mk
 		# ghc with hadrian is unhappy with these c.opts
-		#echo "*.*.ghc.c.opts += ${CFLAGS}" >> _build/hadrian.settings
+		echo "*.*.ghc.c.opts += ${GHC_FLAGS}" >> _build/hadrian.settings
 		#echo "SRC_LD_OPTS+=${LDFLAGS}" >> mk/build.mk
 #		echo "*.*.ghc.link.opts += ${LDFLAGS}" >> _build/hadrian.settings
 		# Speed up initial Cabal bootstrap
 		#echo "utils/ghc-cabal_dist_EXTRA_HC_OPTS+=$(ghc-make-args)" >> mk/build.mk
-
-		# We can't depend on haddock except when bootstrapping when we
-		# must build docs and include them into the binary .tbz2 package
-		# app-text/dblatex is not in portage, can not build PDF or PS
-		#echo "BUILD_SPHINX_PDF  = NO"  >> mk/build.mk
-		hadrian_vars+="--docs=no-sphinx-pdfs "
-		#echo "BUILD_SPHINX_HTML = $(usex doc YES NO)" >> mk/build.mk
-		use doc || hadrian_vars+="--docs=no-sphinx-html "
-		#echo "BUILD_MAN = $(usex doc YES NO)" >> mk/build.mk
-		use doc || hadrian_vars+="--docs=no-sphinx-man "
-		# this controls presence on 'xhtml' and 'haddock' in final install
-		#echo "HADDOCK_DOCS       = YES" >> mk/build.mk
 
 #		# not used outside of ghc's test
 #		if [[ -n ${GHC_BUILD_DPH} ]]; then
@@ -626,17 +614,6 @@ src_configure() {
 #				echo "BUILD_DPH = NO" >> mk/build.mk
 #		fi
 
-		# Any non-native build has to skip as it needs
-		# target haddock binary to be runnabine.
-		if ! is_native; then
-			# disable docs generation as it requires running stage2
-			# echo "HADDOCK_DOCS=NO" >> mk/build.mk
-			hadrian_vars+="--docs=no-haddocks "
-			# echo "BUILD_SPHINX_HTML=NO" >> mk/build.mk
-			hadrian_vars+="--docs=no-sphinx-pdfs "
-			# echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
-			hadrian_vars+="--docs=no-sphinx-html "
-		fi
 
 #		if is_crosscompile; then
 #			# Install ghc-stage1 crosscompiler instead of
@@ -644,24 +621,6 @@ src_configure() {
 #			#echo "Stage1Only=YES" >> mk/build.mk
 #			sed -i -e 's/finalStage = Stage2/finalStage = Stage1/' \
 #				hadrian/UserSettings.hs
-#		fi
-
-#		# allows overriding build flavours for libraries:
-#		# v   - vanilla (static libs)
-#		# p   - profiled
-#		# dyn - shared libraries
-#		# example: GHC_LIBRARY_WAYS="v dyn"
-#		if [[ -n ${GHC_LIBRARY_WAYS} ]]; then
-#			echo "GhcLibWays=${GHC_LIBRARY_WAYS}" >> mk/build.mk
-#		fi
-#		echo "BUILD_PROF_LIBS = $(usex profile YES NO)" >> mk/build.mk
-
-#		if [[ -n $HADRIAN_FLAVOUR ]]; then
-#			hadrian_vars+="--flavour=${HADRIAN_FLAVOUR} "
-#		elif use profile; then
-#			hadrian_vars+="--flavour=default "
-#		else
-#			hadrian_vars+="--flavour=no-profiling "
 #		fi
 
 		# Get ghc from the unpacked binary .tbz2
@@ -721,7 +680,7 @@ src_configure() {
 			econf_args+=(--host=${CBUILD})
 		fi
 
-#		if use ghcmakebinary; then
+		if use ghcmakebinary; then
 			# When building booting libary we are trying to
 			# bundle or restrict most of external depends
 			# with unstable ABI:
@@ -730,24 +689,24 @@ src_configure() {
 			#    https://bugs.gentoo.org/557478
 			#  - disable ncurses support for ghc-pkg
 			#echo "libraries/haskeline_CONFIGURE_OPTS *. += --flag=-terminfo" >> mk/build.mk
-#			echo "*.haskeline.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
+			echo "*.haskeline.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
 			#echo "utils/ghc-pkg_HC_OPTS += -DBOOTSTRAPPING" >> mk/build.mk
-#			echo "*.ghc-pkg.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
-#		elif is_native; then
+			echo "*.ghc-pkg.cabal.configure.opts += --flag=-terminfo" >> _build/hadrian.settings
+		elif is_native; then
 			# using ${GTARGET}'s libffi is not supported yet:
 			# GHC embeds full path for ffi includes without /usr/${CTARGET} account.
 			econf_args+=(--with-system-libffi)
 			econf_args+=(--with-ffi-includes=$($(tc-getPKG_CONFIG) libffi --cflags-only-I | sed -e 's@^-I@@'))
-#		fi
+		fi
 
-#		einfo "Final mk/build.mk:"
+		einfo "Final _build/hadrian.settings:"
 		#cat mk/build.mk || die
-#		cat _build/hadrian.settings || die
+		cat _build/hadrian.settings || die
 
-		econf --build="${CHOST}" # ${econf_args[@]} \
+		econf ${econf_args[@]} \
 #			--enable-bootstrap-with-devel-snapshot \
-#			$(use_enable elfutils dwarf-unwind) \
-#			$(use_enable numa)
+			$(use_enable elfutils dwarf-unwind) \
+			$(use_enable numa)
 
 		if [[ ${PV} == *9999* ]]; then
 			GHC_PV="$(grep 'S\[\"PACKAGE_VERSION\"\]' config.status | sed -e 's@^.*=\"\(.*\)\"@\1@')"
@@ -758,6 +717,67 @@ src_configure() {
 
 src_compile() {
 	if ! use binary; then
+		# create an array of CLI flags to be passed to hadrian build:
+		local hadrian_vars=()
+
+		# We can't depend on haddock except when bootstrapping when we
+		# must build docs and include them into the binary .tbz2 package
+		# app-text/dblatex is not in portage, can not build PDF or PS
+		#echo "BUILD_SPHINX_PDF  = NO"  >> mk/build.mk
+		hadrian_vars+=("--docs=no-sphinx-pdfs")
+		#echo "BUILD_SPHINX_HTML = $(usex doc YES NO)" >> mk/build.mk
+		use doc || hadrian_vars+=("--docs=no-sphinx-html")
+		#echo "BUILD_MAN = $(usex doc YES NO)" >> mk/build.mk
+		use doc || hadrian_vars+=("--docs=no-sphinx-man")
+		# this controls presence on 'xhtml' and 'haddock' in final install
+		#echo "HADDOCK_DOCS       = YES" >> mk/build.mk
+		use doc || hadrian_vars+=("--docs=no-haddocks")
+
+		# Any non-native build has to skip as it needs
+		# target haddock binary to be runnabine.
+		if ! is_native; then
+			# disable docs generation as it requires running stage2
+			# echo "HADDOCK_DOCS=NO" >> mk/build.mk
+			hadrian_vars+=("--docs=no-haddocks")
+			# echo "BUILD_SPHINX_HTML=NO" >> mk/build.mk
+			hadrian_vars+=("--docs=no-sphinx-pdfs")
+			# echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
+			hadrian_vars+=("--docs=no-sphinx-html")
+		fi
+
+#		# allows overriding build flavours for libraries:
+#		# v   - vanilla (static libs)
+#		# p   - profiled
+#		# dyn - shared libraries
+#		# example: GHC_LIBRARY_WAYS="v dyn"
+#		if [[ -n ${GHC_LIBRARY_WAYS} ]]; then
+#			echo "GhcLibWays=${GHC_LIBRARY_WAYS}" >> mk/build.mk
+#		fi
+#		echo "BUILD_PROF_LIBS = $(usex profile YES NO)" >> mk/build.mk
+
+		###
+		# TODO: Move these env vars to a hadrian eclass, for better
+		# documentation and clarity
+		###
+
+		# Control the build flavour
+		if use profile; then
+			: ${HADRIAN_FLAVOUR:="default"}
+		else
+			: ${HADRIAN_FLAVOUR:="no-profiling"}
+		fi
+
+		hadrian_vars+=("--flavour=${HADRIAN_FLAVOUR}")
+
+		# Control the verbosity of hadrian. Default is one level of --verbose
+		${HADRIAN_VERBOSITY:=1}
+
+		local n="${HADRIAN_VERBOSITY}"
+		until [[ $n -eq 0 ]]; do
+			hadrian_vars+=("--verbose")
+			n=$(($n - 1 ))
+		done
+
 #		# Stage1Only crosscompiler does not build stage2
 #		if ! is_crosscompile; then
 #			# 1. build/pax-mark compiler binary first
@@ -777,10 +797,15 @@ src_compile() {
 #		# 3. and then all the rest
 #		#emake all
 
-#		einfo "Running: hadrian -j$(nproc) ${hadrian_vars}"
-#		hadrian -j$(nproc) ${hadrian_vars} || die
-		einfo "Running: hadrian -j$(nproc)"
-		hadrian --flavour=quickest --docs=no-sphinx-pdfs -j$(nproc) binary-dist-dir || die
+		local hadrian=(
+			/usr/bin/hadrian
+			-j$(nproc)
+			"${hadrian_vars[@]}"
+			binary-dist-dir
+		)
+
+		einfo "Running: ${hadrian[@]}"
+		"${hadrian[@]}" || die
 	fi # ! use binary
 }
 
