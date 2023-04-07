@@ -17,7 +17,7 @@ PYTHON_COMPAT=( python3_{9..11} )
 inherit python-any-r1
 inherit autotools bash-completion-r1 flag-o-matic ghc-package
 inherit multiprocessing pax-utils toolchain-funcs prefix
-inherit check-reqs unpacker
+inherit check-reqs llvm unpacker
 DESCRIPTION="The Glasgow Haskell Compiler"
 HOMEPAGE="https://www.haskell.org/ghc/"
 
@@ -116,6 +116,8 @@ SRC_URI="!binary? (
 	https://downloads.haskell.org/ghc/${PV/_/-}/${GHC_P}-src.tar.xz
 	test? ( https://downloads.haskell.org/ghc/${PV/_/-}/${GHC_P}-testsuite.tar.xz )
 )"
+#SRC_URI+=" https://dev.gentoo.org/~sam/distfiles/${CATEGORY}/${PN}/${P}-riscv64-llvm.patch.xz"
+
 S="${WORKDIR}"/${GHC_P}
 
 [[ -n $arch_binaries ]] && SRC_URI+=" !ghcbootstrap? ( $arch_binaries )"
@@ -127,10 +129,11 @@ BUMP_LIBRARIES=(
 LICENSE="BSD"
 SLOT="0/${PV}"
 KEYWORDS="~amd64 ~x86"
-IUSE="big-endian +doc elfutils ghcbootstrap ghcmakebinary +gmp numa profile test"
+IUSE="big-endian +doc elfutils ghcbootstrap ghcmakebinary +gmp llvm numa profile test unregisterised"
 IUSE+=" binary"
 RESTRICT="!test? ( test )"
 
+LLVM_MAX_SLOT="14"
 RDEPEND="
 	!<dev-haskell/process-1.6.16.0-r1
 	>=dev-lang/perl-5.6.1
@@ -139,6 +142,12 @@ RDEPEND="
 	elfutils? ( dev-libs/elfutils )
 	!ghcmakebinary? ( dev-libs/libffi:= )
 	numa? ( sys-process/numactl )
+	llvm? (
+		<sys-devel/llvm-$((${LLVM_MAX_SLOT} + 1)):=
+		|| (
+			sys-devel/llvm:14
+		)
+	)
 "
 
 # This set of dependencies is needed to run
@@ -179,6 +188,7 @@ needs_python() {
 REQUIRED_USE="
 	?? ( ghcbootstrap binary )
 	?? ( profile binary )
+	?? ( llvm unregisterised )
 "
 
 # haskell libraries built with cabal in configure mode, #515354
@@ -342,7 +352,7 @@ relocate_path() {
 # $1 - new absolute root path
 # $2 - ghc version unpacked in ${WORKDIR}
 relocate_ghc() {
-	local to=$1 ghc_v=$2
+	local to=$1 ghc_v=${BIN_PV}
 
 	# libdir for prebuilt binary and for current system may mismatch
 	# It does for prefix installation for example: bug #476998
@@ -429,6 +439,15 @@ ghc-check-bootstrap-version () {
 	die "$diemsg"
 }
 
+llvmize() {
+	[[ -z "${1}" ]] && return
+	( find "${1}" -type f \
+		| file -if- \
+		| grep "text/x-shellscript" \
+		| awk -F: '{print $1}' \
+		| xargs sed -i "s#^exec #PATH=\"$(get_llvm_prefix "${LLVM_MAX_SLOT}")/bin:\${PATH}\" exec #") || die
+}
+
 pkg_pretend() {
 	[[ ${MERGE_TYPE} != binary ]] && use ghcbootstrap && ghc-check-bootstrap-version
 	ghc-check-reqs check-reqs_pkg_pretend
@@ -459,6 +478,8 @@ pkg_setup() {
 	if needs_python; then
 		python-any-r1_pkg_setup
 	fi
+
+	use llvm && llvm_pkg_setup
 }
 
 src_unpack() {
@@ -509,6 +530,8 @@ src_prepare() {
 			pax-mark -m "${WORKDIR}/usr/$(get_libdir)/${PN}-${bin_pv}/bin/ghc"
 		fi
 	fi
+
+	use llvm && ! use ghcbootstrap && llvmize "${WORKDIR}/usr/bin"
 
 	# binpkg may have been built with FEATURES=splitdebug
 	if [[ -d "${WORKDIR}/usr/lib/debug" ]] ; then
@@ -619,6 +642,12 @@ src_prepare() {
 
 		# https://gitlab.haskell.org/ghc/ghc/-/issues/22965
 		#eapply "${FILESDIR}/${PN}-9.2.6-fix-alignment-of-capability.patch"
+		#eapply "${FILESDIR}"/${PN}-9.0.2-disable-unboxed-arrays.patch
+		#eapply "${FILESDIR}"/${PN}-9.0.2-llvm-13.patch
+		#eapply "${FILESDIR}"/${PN}-9.0.2-llvm-14.patch
+		#eapply "${FILESDIR}"/latomic-subword
+		#eapply "${WORKDIR}"/${P}-riscv64-llvm.patch
+		eapply "${FILESDIR}"/${PN}-9.0.2-fptools.patch # clang-16 workaround
 		eapply "${FILESDIR}"/${PN}-9.0.2-sphinx-6.patch
 
 		# mingw32 target
@@ -767,7 +796,8 @@ src_configure() {
 		econf ${econf_args[@]} \
 			--enable-bootstrap-with-devel-snapshot \
 			$(use_enable elfutils dwarf-unwind) \
-			$(use_enable numa)
+			$(use_enable numa) \
+			$(use_enable unregisterised)
 
 		if [[ ${PV} == *9999* ]]; then
 			GHC_PV="$(grep 'S\[\"PACKAGE_VERSION\"\]' config.status | sed -e 's@^.*=\"\(.*\)\"@\1@')"
@@ -823,6 +853,8 @@ src_install() {
 		#    /usr/bin/install: cannot create regular file \
 		#           '/tmp/portage-tmpdir/portage/cross-armv7a-unknown-linux-gnueabi/ghc-9999/image/usr/lib64/armv7a-unknown-linux-gnueabi-ghc-8.3.20170404': No such file or directory
 		emake -j1 install DESTDIR="${D}"
+
+		use llvm && llvmize "${ED}/usr/bin"
 
 		# Skip for cross-targets as they all share target location:
 		# /usr/share/doc/ghc-9999/
