@@ -10,30 +10,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Set up python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-
     - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install pkgcheck
-      run: |
-        pip install --upgrade pip
-        pip install pkgcore==0.12.17
-        pip install pkgcheck>=0.10.3
-    - name: Fetch gentoo repo
-      run: |
-        pmaint --verbose sync gentoo
-    - name: Prune packages from ::gentoo that exist in ::haskell
-      run: |
-
-        for p in $( cd /home/runner/work/gentoo-haskell/gentoo-haskell; ls -d *-*/*/ )
-        do
-          echo $p
-          rm -rfv /home/runner/.cache/pkgcore/repos/gentoo/$p
-        done
+      uses: actions/checkout@v3
 
     - name: Run pkgcheck
-      uses: hololeap/pkgcheck-action/check@split-actions
+      uses: pkgcore/pkgcheck-action@v1
