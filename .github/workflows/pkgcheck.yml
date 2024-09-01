@@ -36,4 +36,4 @@ jobs:
         done
 
     - name: Run pkgcheck
-      uses: hololeap/pkgcheck-action/check@split-actions
+      uses: hololeap/pkgcheck-action/check@split-actions-2
