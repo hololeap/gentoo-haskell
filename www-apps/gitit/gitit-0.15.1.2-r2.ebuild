@@ -23,6 +23,10 @@ CABAL_CHDEPS=(
 	'network >= 2.6 && < 3.2' 'network >= 2.6'
 )
 
+PATCHES=(
+	"${FILESDIR}/${PN}-0.15.1.2-pandoc-3_8.patch"
+)
+
 RDEPEND="
 	>=dev-haskell/aeson-0.7:=[profile?] <dev-haskell/aeson-2.3:=[profile?]
 	>=dev-haskell/base64-bytestring-0.1:=[profile?]
