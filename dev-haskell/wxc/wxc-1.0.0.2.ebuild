@@ -1,7 +1,7 @@
 # Copyright 2025 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=8
+EAPI=9
 
 WX_GTK_VER="3.2-gtk3"
 inherit wxwidgets cmake

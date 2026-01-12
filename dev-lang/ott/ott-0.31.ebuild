@@ -1,7 +1,7 @@
 # Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=8
+EAPI=9
 
 DESCRIPTION="Ott is a tool for writing definitions of programming languages and calculi. "
 HOMEPAGE="http://www.cl.cam.ac.uk/~pes20/ott/"

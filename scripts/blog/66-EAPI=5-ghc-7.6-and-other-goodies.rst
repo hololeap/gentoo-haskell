@@ -60,7 +60,7 @@ to provide that).
 
 Okay. Enough ranting.
 
-EAPI=5
+EAPI=9
 ------
 
 Some of experienced gentoo haskell users already know

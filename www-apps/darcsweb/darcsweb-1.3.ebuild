@@ -1,7 +1,7 @@
 # Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=8
+EAPI=9
 
 PYTHON_COMPAT=( python3_{{9..13},13t} )
 inherit webapp python-single-r1
